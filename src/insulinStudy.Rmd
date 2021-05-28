@@ -2,7 +2,7 @@
 title: "Untitled"
 author: "Autores: Diego Alberto López Herrera, Pablo Rivas Castellanos"
 date: "Mayo de 2021"
-bibliography: PRA1.bib
+bibliography: bibliografia.bib
 output:
   pdf_document:
     number_sections: yes
@@ -27,20 +27,56 @@ library(ggplot2)
 ******
 # Problema de estudio
 
-
 ## Importancia
 
 ## Objeto
 
-******
-# Integración y selección de los datos
-
+## Dataset seleccionado
 
 Cita:[@mehmet2020]
 
 ******
-# Limpieza de los datos
+# Integración y selección de los datos
 
+## Carga de los datos
+
+```{r attr.source='.numberLines'}
+dt <- read.table(
+   "../res/diabetes.csv", 
+   header = TRUE, 
+   sep = ",", 
+   stringsAsFactors = TRUE
+   )
+
+dtbk <- dt
+```
+
+## Atributos
+
+Vista previa del dataset.
+
+```{r attr.source='.numberLines'}
+str(dt)
+```
+
+Corrección de tipos
+
+```{r attr.source='.numberLines'}
+dt$Outcome <- as.factor(dt$Outcome)
+```
+
+**TODO**Genera tabla descripción de variables.
+
+```{r attr.source='.numberLines', include=FALSE}
+#Tabla a rellenar
+for(i in seq(length(names(dt)))){
+   mytype <-if(is.factor(dt[,names(dt)[i]])) "Categórica nominal" else "Numérica entera"
+  cat(paste("\n|", names(dt)[i], "|", mytype, "| a |"))
+}
+```
+
+******
+# Limpieza de los datos
 
 ## Datos faltantes
 
