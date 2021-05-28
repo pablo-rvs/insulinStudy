@@ -1,11 +1,63 @@
 ---
 title: "Untitled"
-author: "Diego Alberto López Herrera, Pablo Rivas Castellanos"
+author: "Autores: Diego Alberto López Herrera, Pablo Rivas Castellanos"
 date: "Mayo de 2021"
-output: pdf_document
+bibliography: PRA1.bib
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+******
+# Dependencias  
+
+A continuación se cargan la librerías empleadas en el presente trabajo.
+
+```{r attr.source='.numberLines', message = FALSE, results='hide'}
+library(ggplot2)
+```
+
+
+******
+# Problema de estudio
+
+
+## Importancia
+
+## Objeto
+
+******
+# Integración y selección de los datos
+
+
+Cita:[@mehmet2020]
+
+******
+# Limpieza de los datos
+
+
+## Datos faltantes
+
+## Outliers
+
+******
+# Análisis  
+
+
+******
+# Representación gráfica
+
+
+******
+# Resolución del problema. Conclusiones  
+
+
+******
+# Agradecimientos 
 
