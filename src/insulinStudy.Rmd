@@ -1,0 +1,11 @@
+---
+title: "Untitled"
+author: "Diego Alberto López Herrera, Pablo Rivas Castellanos"
+date: "Mayo de 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
