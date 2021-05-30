@@ -21,6 +21,8 @@ A continuación se cargan la librerías empleadas en el presente trabajo.
 
 ```{r attr.source='.numberLines', message = FALSE, results='hide'}
 library(ggplot2)
+library(gridExtra)
+library(VIM)
 ```
 
 
@@ -32,7 +34,7 @@ library(ggplot2)
 ## Objeto
 
 ## Dataset seleccionado
-
+Datos de India, primera publicación de los datos, 1990
 Cita:[@mehmet2020]
 
 ******
@@ -75,12 +77,159 @@ for(i in seq(length(names(dt)))){
 }
 ```
 
+## Exploración previa
+
+Para obtener una imagen preliminar del conjunto de datos se representa gráficamente su contenido:
+
+```{r attr.source='.numberLines', message = FALSE, fig1, fig.height = 15, fig.width=18}
+bar.plots <- list()
+cols <- c(names(dt)[sapply(dt, is.numeric)], "risk")
+cols <- setdiff(colnames(dt), cols)
+
+for(var in setdiff(colnames(dt), names(dt)[sapply(dt, is.numeric)])){
+  p <- ggplot(dt, aes_string(x = var)) + 
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+       geom_bar() +
+       ggtitle(var)
+  bar.plots[[var]] <- p
+}
+
+for(var in names(dt)[sapply(dt, is.numeric)]){
+  p <- ggplot(dt, aes_string(x = var)) + 
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+       geom_histogram(bins = 15) +
+       ggtitle(var)
+  bar.plots[[var]] <- p
+}
+
+
+do.call(grid.arrange, c(bar.plots, ncol=4))
+```
+
+Se observa un cierto desbalance en las clases de la variable de *Outcome*.
+
 ******
 # Limpieza de los datos
 
 ## Datos faltantes
 
+Para estudiar la presencia de registros incompletos, se comprueba en primer lugar que las observaciones pertenezcan al dominio de las respectivas variables:
+
+```{r attr.source='.numberLines'}
+summary(dt)
+```
+
+Se observa que existen observaciones con valor 0 en las variables *Glucose*, *BlooPressure*, *SkinThickness*, *Insulin* y *BMI*. Al no pertenecer 0 al dominio de las variables mencionadas, se asume que se trata de un valor testigo empleado para indicar los valores faltantes.
+
+```{r attr.source='.numberLines'}
+columns <-c ("Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI")
+
+for(column in columns) {
+  dt[dt[,column] == 0, column] <- NA
+}
+
+summary(dt)
+```
+
+Finalmente, se calcula el número de registros incompletos en el dataset.
+
+```{r attr.source='.numberLines'}
+nrow(dt[is.na(dt),])
+```
+
+Se observa que hay un total de 425 registros incompletos entre los cuales se encuentran:
+
+* 5 valores faltantes en la variable *Glucose*.
+* 35 valores faltantes en la variable *BloodPressure*. 
+* 374 valores faltantes en la variable *Insulin*. 
+* 11 valores faltantes en la variable *BMI*. 
+
 ## Outliers
+
+Para estudiar la presencia de outliers se recurre al empleo de diagramas de caja de las distintas variables numéricas:
+
+```{r attr.source='.numberLines', warning =FALSE, message = FALSE, fig2, fig.height = 6, fig.width=10}
+box.plots <- list()
+cols <- names(dt)[sapply(dt, is.numeric)]
+  
+for(var in cols){
+  p <- ggplot(dt, aes_string(x=var)) + 
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+       geom_boxplot() +
+       ggtitle(var)
+  box.plots[[var]] <- p
+}
+
+do.call(grid.arrange, c(box.plots, ncol=2))
+```
+
+Se observan valores extremos en las variables *Pregnancies*, *BloodPressure*, *SkinThickness*, *Insulin*, *BMI*, *DiabetesPedigreeFunction* y *Age*. A continuación se discute su legitimidad, y, cuando proceda, su tratamiento.
+
+1. **Número de embarazos**: Existen valores extremos en 14, 15 y 17 embarazos. Considerando que el índice de fecundidad en la década previa a la primera publicación de los datos (1990) en India tuvo una tendencia decreciente desde 4.83 hasta 4.05 [@natalidadindia], se concluye que los datos son legítimos y no requieren tratamiento.
+2. **Presión sanguínea**: Se observan valores entre 24 y 122 mmHg. atendiendo a los valores de presión sanguínea distólica aceptados, se tiene que los valores normales de personas saludables son inferiores a 80mmHg, con un valor media entre 80 y 40 mmHg [@presionsanguinea]. Igualmente, niveles superiores a los 110 mmHg son considerados casos de hipertensión grado 3 [@presionsanguinea]. Considerando la cercanía de los valores extremos con los puntos indicados, se considera que las observaciones son válidas y no deben de ser tratados de manera especial.
+3. **Doblez de piel**: Se observa un valor muy alejado en la prueba, con el valor 99. Se considera que podría ser un *outlier* y será será imputado conjuntamente con los valores faltantes.
+4. **Nivel de insulina**: Los valores para personas saludables se encuentran entre los 16 y 166 $\mu l\ U/ml$. Se considera que los valores observados son correctos al ser menores a 5 veces el valor máximo para personas saludables.
+6. **Índice de masa corporal**: Se considera que índices de masa corporal superiores a $60kg/m^2$ son sospechosos de ser outliers, por lo que se imputarán estos valores.
+7. **DiabetesPedigreeFunction**: Esta variable califica numéricamente la predisposición genética a la diabetes en función de los antecedentes familiares. Al no disponerse de información acerca de su método de cálculo, su dominio ni su interpretación, se toma la decisión de considerar todos sus valores correctos y legítimos.
+9. **Edad**: Se observa especial acumulación de observaciones entre los 25 y 40 años, estando todas las edades comprendidas entre 20 y 81 años. Se considera que la distribución puede ser correcta y no son necesarias otras correcciones.
+
+
+```{r attr.source='.numberLines'}
+dt$SkinThickness[dt$SkinThickness == 99] <-NA
+dt$BMI[dt$BMI > 60] <- NA
+summary(dt)
+```
+
+## Imputación de valores
+
+```{r attr.source='.numberLines', warning=FALSE}
+dt <- kNN(dt,
+                     variable = colnames(dt)[colSums(is.na(dt))>0], 
+                     k = 4, 
+                     imp_var = FALSE)
+
+summary(dt)
+```
+
+## Estudio bivariante.
+
+```{r attr.source='.numberLines', message = FALSE, warning=FALSE, fig3, fig.height = 15, fig.width=14}
+
+dep.var <- "Outcome"
+bar.plots <- list()
+cols <- c(names(dt)[sapply(dt, is.numeric)], dep.var)
+cols <- setdiff(colnames(dt), cols)
+
+for(var in cols){
+  p <- ggplot(dt, aes_string(x=var, fill=dep.var)) + 
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+       geom_bar() +
+       ggtitle(var)
+  bar.plots[[var]] <- p
+  p <- ggplot(dt, aes_string(x=var, fill=dep.var)) + 
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+       geom_bar(position = "fill") +
+       ggtitle(paste(var,"%"))
+  bar.plots[[paste(var,"%")]] <- p
+}
+
+cols <- names(dt)[sapply(dt, is.numeric)]
+for(var in names(dt)[sapply(dt, is.numeric)]){
+  p <- ggplot(dt, aes_string(x=var, fill=dep.var)) + 
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+       geom_histogram(bins=30) +
+       ggtitle(var)
+  bar.plots[[var]] <- p
+  p <- ggplot(dt, aes_string(x=var, fill=dep.var)) + 
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+       geom_histogram(bins=30, position = "fill") +
+       ggtitle(paste(var,"%"))
+  bar.plots[[paste(var,"%")]] <- p
+}
+
+do.call(grid.arrange, c(bar.plots, ncol=4))
+```
+
 
 ******
 # Análisis  
