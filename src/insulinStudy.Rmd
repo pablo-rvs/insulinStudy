@@ -22,6 +22,8 @@ A continuación se cargan la librerías empleadas en el presente trabajo.
 ```{r attr.source='.numberLines', message = FALSE, results='hide'}
 library(ggplot2)
 library(gridExtra)
+library(ggcorrplot)
+
 library(VIM)
 ```
 
@@ -49,8 +51,6 @@ dt <- read.table(
    sep = ",", 
    stringsAsFactors = TRUE
    )
-
-dtbk <- dt
 ```
 
 ## Atributos
@@ -182,16 +182,34 @@ summary(dt)
 
 ## Imputación de valores
 
+```{r attr.source='.numberLines', message = FALSE, fig6, fig.height = 15, fig.width=18}
+
+dtbk <- dt
+
+numeric_columns <- sapply(dt, is.numeric)
+dt[numeric_columns] <- as.data.frame(
+  scale(dt[numeric_columns])
+)
+```
+
 ```{r attr.source='.numberLines', warning=FALSE}
 dt <- kNN(dt,
                      variable = colnames(dt)[colSums(is.na(dt))>0], 
                      k = 4, 
                      imp_var = FALSE)
 
+
+for(col.name in columns) {
+  dt[,col.name] <- 
+}
+
+
 summary(dt)
 ```
 
 ## Estudio bivariante.
+
+### Representación gráfica
 
 ```{r attr.source='.numberLines', message = FALSE, warning=FALSE, fig3, fig.height = 15, fig.width=14}
 
@@ -230,6 +248,43 @@ for(var in names(dt)[sapply(dt, is.numeric)]){
 do.call(grid.arrange, c(bar.plots, ncol=4))
 ```
 
+
+### Estudio de correlaciones
+
+Para la interpretación del coeficiente se pueden emplear los valores de la tabla siguiente:
+
+| Coeficiente | Efecto débil | Efecto moderado | Efecto fuerte |
+|:---|:---|:---|:---|
+| $\eta²$ [@eta2] | [0.01, 0.06] | (0.06, 0.14] | (0.14, 1] |
+| abs(Coeficiente de pearson) [@pearson] | [0, 0.3] | (0.3, 0.5] | (0.5, 1] |
+
+```{r attr.source='.numberLines', message = FALSE, fig6, fig.height = 8, fig.width=18}
+# Crames's V correlation
+aux <-as.data.frame(dt[, sapply(dt, is.factor)])
+
+# Create eta-squared correlation plot.
+numeric_cols <- names(dt)[sapply(dt, is.numeric)]
+
+assoc_mat <- matrix(nrow = length(numeric_cols), 
+                    ncol = length(aux), 
+                    dimnames=list(numeric_cols, names(aux)))
+
+for (c in seq(ncol(assoc_mat))){
+   for (r in seq(length(numeric_cols))){
+      anova_res <- summary(aov(dt[,numeric_cols[r]] ~ aux[, c]))[[1]][, "Sum Sq"]
+      assoc_mat[[r, c]] <- anova_res[1] / sum(anova_res)
+   }
+}
+p1 <- ggcorrplot(assoc_mat, lab = TRUE) +
+      ggtitle("Eta cuadrado")
+
+# Pearson correlation
+p2 <- ggcorrplot(cor(dt[names(dt)[sapply(dt, is.numeric)]]), lab = TRUE) +
+      ggtitle("Coeficiente de Pearson")
+
+
+grid.arrange(p1, p2, layout_matrix=rbind(c(1,2)))
+```
 
 ******
 # Análisis  
