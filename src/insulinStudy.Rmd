@@ -23,6 +23,8 @@ A continuación se cargan la librerías empleadas en el presente trabajo.
 library(ggplot2)
 library(gridExtra)
 library(ggcorrplot)
+library(ggdendro)
+library(GGally)
 
 library(VIM)
 ```
@@ -36,13 +38,15 @@ library(VIM)
 ## Objeto
 
 ## Dataset seleccionado
-Datos de India, primera publicación de los datos, 1990
+Datos de nativos americanos Pima. Primera publicación de los datos, 1990
 Cita:[@mehmet2020]
 
 ******
 # Integración y selección de los datos
 
 ## Carga de los datos
+
+Se procede a la carga del juego de datos, que se encuentran en el fichero "../res/diabetes.csv", en formato CSV con encabezados y coma (,) como separador de campos.
 
 ```{r attr.source='.numberLines'}
 dt <- read.table(
@@ -55,19 +59,29 @@ dt <- read.table(
 
 ## Atributos
 
-Vista previa del dataset.
+Seguidamente se estudian las variables y su contenido. Para ello en primer lugar se muesta la representación como *String* del juego de datos.
 
 ```{r attr.source='.numberLines'}
 str(dt)
 ```
 
-Corrección de tipos
+Se observa que el dataset tiene 9 variables, todas de tipo numérico excepto *Outcome*, que ha sido incorrectamente interpretada como variable numérica. A continuación se corrigen los tipos.
 
 ```{r attr.source='.numberLines'}
 dt$Outcome <- as.factor(dt$Outcome)
 ```
 
-**TODO**Genera tabla descripción de variables.
+| Variable | Tipo | Descripción |
+| Pregnancies | Numérica entera | Número de embarazos. |
+| Glucose | Numérica entera | Niveles de glucosa en plasma del examen de glucosa posprandial de 2 horas ($\mu g/l$). |
+| BloodPressure | Numérica entera | Presión arterial diastólica (mmHg). |
+| SkinThickness | Numérica entera | Espesor del pliegue cutáneo del triceps (mm). |
+| Insulin | Numérica entera | Niveles de insulina del examen de glucosa posprandial de 2 horas ($\mu l\ U/ml$). |
+| BMI | Numérica entera | Índice de masa corporal ($kg/m^2$). |
+| DiabetesPedigreeFunction | Numérica entera | Índice de predisposición a la diabetes por antecedentes genéticos. |
+| Age | Numérica entera | Edad de la paciente |
+| Outcome | Categórica nominal | Desarrollo de la diabetes. |
+
 
 ```{r attr.source='.numberLines', include=FALSE}
 #Tabla a rellenar
@@ -106,10 +120,15 @@ for(var in names(dt)[sapply(dt, is.numeric)]){
 do.call(grid.arrange, c(bar.plots, ncol=4))
 ```
 
-Se observa un cierto desbalance en las clases de la variable de *Outcome*.
+De la exploración preliminar de las distribuciones se extraen las siguientes conclusiones:
+
+* Existe desbalance en las clases de la variable de *Outcome*.
+* Parece observarse la existencia de valores testigo en 0 en las variables *Glucose*, *BlodPressure*, *SkinThickness*, *Insulin* y *BMI*.
 
 ******
 # Limpieza de los datos
+
+En este apartado se procesarás los datos con el objetivo de obtener la mejor representación posible de los mismos. Con este fin, se comprobará la presencia de datos faltantes y de *outliers* y se decidirá el tratamiento más apropiado para ambos. Adicionalmente se estudiará la posibilidad de reducción de la dimensionalidad y la correlación entre las distintas variables.
 
 ## Datos faltantes
 
@@ -119,19 +138,17 @@ Para estudiar la presencia de registros incompletos, se comprueba en primer luga
 summary(dt)
 ```
 
-Se observa que existen observaciones con valor 0 en las variables *Glucose*, *BlooPressure*, *SkinThickness*, *Insulin* y *BMI*. Al no pertenecer 0 al dominio de las variables mencionadas, se asume que se trata de un valor testigo empleado para indicar los valores faltantes.
+Como se detectó en la representación preliminar gráfica, existen observaciones con valor 0 en las variables *Glucose*, *BlooPressure*, *SkinThickness*, *Insulin* y *BMI*. Al no pertenecer 0 al dominio de las variables mencionadas, se asume que se trata de un valor testigo empleado para indicar los valores faltantes. Al no disponer de información relativa a su significado, a continuación se sustituirán dichos valores por *NA*, para su tratamiento posterior.
 
 ```{r attr.source='.numberLines'}
 columns <-c ("Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI")
-
 for(column in columns) {
   dt[dt[,column] == 0, column] <- NA
 }
-
 summary(dt)
 ```
 
-Finalmente, se calcula el número de registros incompletos en el dataset.
+A continuación se calcula el número de registros incompletos en el dataset.
 
 ```{r attr.source='.numberLines'}
 nrow(dt[is.na(dt),])
@@ -163,15 +180,15 @@ for(var in cols){
 do.call(grid.arrange, c(box.plots, ncol=2))
 ```
 
-Se observan valores extremos en las variables *Pregnancies*, *BloodPressure*, *SkinThickness*, *Insulin*, *BMI*, *DiabetesPedigreeFunction* y *Age*. A continuación se discute su legitimidad, y, cuando proceda, su tratamiento.
+Se observan valores extremos en las variables *Pregnancies*, *BloodPressure*, *SkinThickness*, *Insulin*, *BMI*, *DiabetesPedigreeFunction* y *Age*. En este apartado se discute su legitimidad, y, cuando procede, su tratamiento.
 
-1. **Número de embarazos**: Existen valores extremos en 14, 15 y 17 embarazos. Considerando que el índice de fecundidad en la década previa a la primera publicación de los datos (1990) en India tuvo una tendencia decreciente desde 4.83 hasta 4.05 [@natalidadindia], se concluye que los datos son legítimos y no requieren tratamiento.
-2. **Presión sanguínea**: Se observan valores entre 24 y 122 mmHg. atendiendo a los valores de presión sanguínea distólica aceptados, se tiene que los valores normales de personas saludables son inferiores a 80mmHg, con un valor media entre 80 y 40 mmHg [@presionsanguinea]. Igualmente, niveles superiores a los 110 mmHg son considerados casos de hipertensión grado 3 [@presionsanguinea]. Considerando la cercanía de los valores extremos con los puntos indicados, se considera que las observaciones son válidas y no deben de ser tratados de manera especial.
+1. **Número de embarazos**: Existen valores extremos en 14, 15 y 17 embarazos. Se considera que puede tratarse de observaciones plausibles y no se requiere ninguna acción correctiva.
+2. **Presión sanguínea**: Se observan valores entre 24 y 122 mmHg. Atendiendo a los valores de presión sanguínea distólica aceptados, se tiene que los valores normales de personas saludables son inferiores a 80mmHg, con un valor media entre 80 y 40 mmHg [@presionsanguinea]. Igualmente, niveles superiores a los 110 mmHg son considerados casos de hipertensión grado 3 [@presionsanguinea]. Considerando la cercanía de los valores extremos con los puntos indicados, se considera que las observaciones son válidas y no es necesario ningún tratamiento especial.
 3. **Doblez de piel**: Se observa un valor muy alejado en la prueba, con el valor 99. Se considera que podría ser un *outlier* y será será imputado conjuntamente con los valores faltantes.
-4. **Nivel de insulina**: Los valores para personas saludables se encuentran entre los 16 y 166 $\mu l\ U/ml$. Se considera que los valores observados son correctos al ser menores a 5 veces el valor máximo para personas saludables.
-6. **Índice de masa corporal**: Se considera que índices de masa corporal superiores a $60kg/m^2$ son sospechosos de ser outliers, por lo que se imputarán estos valores.
-7. **DiabetesPedigreeFunction**: Esta variable califica numéricamente la predisposición genética a la diabetes en función de los antecedentes familiares. Al no disponerse de información acerca de su método de cálculo, su dominio ni su interpretación, se toma la decisión de considerar todos sus valores correctos y legítimos.
-9. **Edad**: Se observa especial acumulación de observaciones entre los 25 y 40 años, estando todas las edades comprendidas entre 20 y 81 años. Se considera que la distribución puede ser correcta y no son necesarias otras correcciones.
+4. **Nivel de insulina**: Los valores para personas saludables se encuentran entre los 16 y 166 $\mu l\ U/ml$. [@nivelinsulina]. Se considera que los valores observados son correctos al ser menores a 5 veces el valor máximo para personas saludables.
+6. **Índice de masa corporal**: Se considera que índices de masa corporal superiores a $60kg/m^2$ son sospechosos de ser outliers, por lo que se decide imputarlos conjuntamente con los valores faltantes.
+7. **DiabetesPedigreeFunction**: Esta variable califica numéricamente la predisposición genética a la diabetes en función de los antecedentes familiares. Al no disponerse de información acerca de su método de cálculo, su dominio o su interpretación, se toma la decisión de considerar todos sus valores correctos y legítimos.
+9. **Edad**: Se observa especial acumulación de observaciones entre los 25 y 40 años, estando todas las edades comprendidas entre 20 y 81 años. Se considera que la distribución puede ser correcta y no son necesarias correcciones adicionales.
 
 
 ```{r attr.source='.numberLines'}
@@ -182,36 +199,71 @@ summary(dt)
 
 ## Imputación de valores
 
-```{r attr.source='.numberLines', message = FALSE, fig6, fig.height = 15, fig.width=18}
+Se considera apropiada la imputación de los valores faltantes conjuntamente con los outliers mediante el método *k Nearest Neighbors*, con un k de 4. 
 
+```{r attr.source='.numberLines', warning=FALSE}
 dtbk <- dt
 
-numeric_columns <- sapply(dt, is.numeric)
+numeric_columns <- colnames(dt[,sapply(dt, is.numeric)])
 dt[numeric_columns] <- as.data.frame(
   scale(dt[numeric_columns])
 )
-```
 
-```{r attr.source='.numberLines', warning=FALSE}
-dt <- kNN(dt,
-                     variable = colnames(dt)[colSums(is.na(dt))>0], 
-                     k = 4, 
-                     imp_var = FALSE)
+dt <- kNN(dt, variable = colnames(dt)[colSums(is.na(dt))>0], 
+          k = 4, imp_var = FALSE)
 
 
-for(col.name in columns) {
-  dt[,col.name] <- 
+for(col.name in numeric_columns) {
+  dt[,col.name] <- sd(dtbk[,col.name], na.rm = TRUE)*dt[,col.name]+
+                  mean(dtbk[,col.name], na.rm = TRUE)
 }
 
 
 summary(dt)
 ```
 
+## Estudio reducción de la dimensionalidad por SVD
+
+A continuación se estudia la posibilidad de reducir la dimensionalidad mediante el método *Single Value Decomposition*. La descomposición en valores singulares es un método lineal de factorización de matrices. Sea $X$ una matriz de orden $m$x$n$, se puede descomponer en la forma:
+
+\[X = U\Sigma V^T\]
+
+donde:
+
+   + $U$ es una matriz ortogonal de orden $m$ cuyas columnas son los autovectores de $AA^T$.
+   + $\Sigma$ es una matriz diagonal de orden $m$x$n$ que contiene la raíz de los valores propios ordenados de $AA^T$ de manera decreciente en la diagonal principal, llamados valores singulares.
+   + $V$ es una matriz ortogonal de orden $n$ cuyas columnas son los autovectores de $A^TA$.
+
+Las columna de la matriz $U$ conforman una base del espacio de las observaciones. 
+
+El cálculo de los vectores y valores propios se puede realizar mediante la función *svd()* de *R*.
+Dado que los valores singulares se encuentran ordenados de manera creciente, los vectores conformados por las columnas de menor índice de U y V tienen un efecto mayor. En el caso de que algún valore singular fuese 0, tendríamos que la dimensión asociada a ese vector no forma parte de la base del espacio de observaciones, lográndose una representación más compacta (con menor dimensionalidad) del problema. Adicionalmente, si un conjunto de valores singulares tomasen valores comparativamente pequeños, tendríamos que sus dimensiones asociadas no tiene demasiada influencia, por lo que se podría generar una representación alternativa de los datos que no las incluya.
+[@brunton2020]
+
+A continuación se convierten los datos en una matriz y se obtienen $U$, $\Sigma$ y $V$ con la función *svd()*. Seguidamente se muestran los valores singulares obtenidos. 
+
+```{r attr.source='.numberLines'}
+dt1 <- dt
+dt1$Outcome <- as.numeric(dt1$Outcome)
+dt1 <- scale(dt1)
+
+mat.dt1 <- as.matrix(dt1)
+mdl <- svd(mat.dt1)
+
+mdl$d
+```
+
+Tras comparar los valores propios obtenidos se comprueba que pertenecen al mismo orden de magnitud. Por este motivo se considera apropiado mantener la base original al tener una interpretación más inmediata.
+
 ## Estudio bivariante.
+
+En este apartado se trata de desarrollar una mayor comprensión de la distribución de las distintas variables y la intensidad del efecto de correlación entre ellas y con la variable dependiente.
 
 ### Representación gráfica
 
-```{r attr.source='.numberLines', message = FALSE, warning=FALSE, fig3, fig.height = 15, fig.width=14}
+En primer lugar se representan gráficamente las distintas variables independientes en función de la variable dependiente. 
+
+```{r attr.source='.numberLines', message = FALSE, warning=FALSE, fig3, fig.height = 12, fig.width=14}
 
 dep.var <- "Outcome"
 bar.plots <- list()
@@ -248,8 +300,15 @@ for(var in names(dt)[sapply(dt, is.numeric)]){
 do.call(grid.arrange, c(bar.plots, ncol=4))
 ```
 
+A partir del estudio visual de las gráficas, se plantean las siguiente hipótesis:
+
+1. La probabilidad de desarrollar diabetes aumenta con el número de embarazos. 
+2. Niveles altos de glucosa o de insulina en el examen de glucosa posprandial de 2 horas son un indicador de la enfermedad. También son indicadores de la enfermedad o factores de riesgo niveles de presion sanguínea alta, espesor del pliegue cutáneo del triceps altos o índices de masa corporal elevado. 
+3. Parece observarse una tendencia creciente del recuento de diabéticos con el aumento de la función de pedigree. 
 
 ### Estudio de correlaciones
+
+Para complementar el estudio visual de la distribución de las variables se realizará un estudio de correlaciones empleando los estadísticos *eta cuadrado* $\eta ^2$ y *coeficiente de Pearson*. Nótese que el objetivo de calcular ambos coeficientes es la de disponer de una estimación aproximada de la intensidad del efecto de asociación/correlación entre variables, es decir, de la significancia práctica, independientemente de la significancia estadística. Por este motivo, tomando en consideración la robustez del método ANOVA frente a la falta de normalidad (que se observa en *Pregnancias*, *Age* o *DiabetesPedigreeFunction*), se considera aceptable el uso del coeficiente.
 
 Para la interpretación del coeficiente se pueden emplear los valores de la tabla siguiente:
 
@@ -258,20 +317,20 @@ Para la interpretación del coeficiente se pueden emplear los valores de la tabl
 | $\eta²$ [@eta2] | [0.01, 0.06] | (0.06, 0.14] | (0.14, 1] |
 | abs(Coeficiente de pearson) [@pearson] | [0, 0.3] | (0.3, 0.5] | (0.5, 1] |
 
-```{r attr.source='.numberLines', message = FALSE, fig6, fig.height = 8, fig.width=18}
+```{r attr.source='.numberLines', message = FALSE, fig4, fig.height = 8, fig.width=18}
 # Crames's V correlation
 aux <-as.data.frame(dt[, sapply(dt, is.factor)])
 
 # Create eta-squared correlation plot.
-numeric_cols <- names(dt)[sapply(dt, is.numeric)]
+numeric.cols <- names(dt)[sapply(dt, is.numeric)]
 
-assoc_mat <- matrix(nrow = length(numeric_cols), 
+assoc_mat <- matrix(nrow = length(numeric.cols), 
                     ncol = length(aux), 
-                    dimnames=list(numeric_cols, names(aux)))
+                    dimnames=list(numeric.cols, names(aux)))
 
 for (c in seq(ncol(assoc_mat))){
-   for (r in seq(length(numeric_cols))){
-      anova_res <- summary(aov(dt[,numeric_cols[r]] ~ aux[, c]))[[1]][, "Sum Sq"]
+   for (r in seq(length(numeric.cols))){
+      anova_res <- summary(aov(dt[,numeric.cols[r]] ~ aux[, c]))[[1]][, "Sum Sq"]
       assoc_mat[[r, c]] <- anova_res[1] / sum(anova_res)
    }
 }
@@ -286,9 +345,74 @@ p2 <- ggcorrplot(cor(dt[names(dt)[sapply(dt, is.numeric)]]), lab = TRUE) +
 grid.arrange(p1, p2, layout_matrix=rbind(c(1,2)))
 ```
 
-******
-# Análisis  
 
+Se concluye que existen fuertes asociaciones entre las siguients parejas de variables:
+
+1. *Age* Vs. *Pregnancies*: esta asociación se puede explicar dada la naturaleza acumulativa de las dos variables: hasta ciertas edades, un número elevado de embarazos indicará edades más avanzadas.
+2. *Insulin* Vs. *Glucose*: estas dos variables están asocidas al tratarse de los resultados de una misma prueba y ser la insulina una hormona que interviene directamente ne el control de la glucemia. 
+3. *BMI* Vs. *SkinThickness*: la relación entre estas dos variables también es explicable, dado que mayores índices de masa corporal resultarán en medidas mas altas de espesor del pliegue cutáneo del triceps.
+4. *Glucose* y *Insulin* Vs. *Outcome*: Los niveles de glucosa y de insulina tras el examen de glucosa posprandial de 2 horas están fuertemente relacionado con la variable dependiente.
+
+
+******
+# Análisis
+
+## Clustering
+
+Para obtener una comprensión más completa acerca de la composición del espacio de soluciones se plantea el empleo de modelos de aprendizaje automático no supervisado de *clústering*. 
+
+### Inspección preliminar
+
+En primer lugar, se procede a la visualización de las gráficas de dispersión de las distintas parejas de variables:
+
+```{r attr.source='.numberLines', message = FALSE, fig5, fig.height = 15, fig.width=18}
+ggpairs(dt)
+```
+
+En las proyecciones bidimensionales del espacio no se observan agrupaciones de puntos claras. Si se observan distribuciones diferentes para las variables *Glucose*, *SkinThickness*, *BMI* y *Age* en función de la clase de la variable *Outcome*. Nótese que esta conclusión esta alineada con los resultados del estudio de correlaciones, que detectó importantes correlaciones entre estas variables.
+
+### Ajueste del modelo
+
+Dada su simplicidad y flexibilidad, se decide ajustar un modelo de *clústering* jerárquico sobre el espacio de las variables independientes, para extrapolar los diferentes tipos de pacientes.
+
+```{r attr.source='.numberLines', message = FALSE, fig6, fig.height = 15, fig.width=15}
+scaled.dt <- dt[,!(names(dt) %in% c("Outcome"))]
+numeric.cols <- names(scaled.dt)[sapply(scaled.dt, is.numeric)]
+
+scaled.dt[, numeric.cols] <- scale(dt[, numeric.cols])
+
+c.hier <- hclust(dist(scaled.dt, method = "euclidean"), method = "ward")
+ggdendrogram(c.hier, rotate = TRUE)
+```
+
+Atendiendo al dendograma obtenido, 4 clusters parece la opción más apropiada.
+
+### Visualización de resultados e interpretación.
+
+A continuación se representan las agrupaciones obtenidos y su interpretación:
+
+```{r attr.source='.numberLines', message = FALSE, fig7, fig.height = 15, fig.width=15}
+plot.clusters <- function(dt, clusters) {
+  # Color palet extracted from: 
+  # https://www.datanovia.com/en/blog/top-r-color-palettes-to-know-for-great-data-visualization/
+  color.palette <- c("#1B9E77", "#D95F02", "#7570B3", 
+                     "#E7298A", "#66A61E",  "#E6AB02", "#A6761D")
+  c <- as.factor(clusters)
+  K=length(levels(c))
+  print(ggpairs(dt, aes(colour = c)) + 
+    scale_color_manual(values= color.palette[1:K]) + 
+    scale_fill_manual(values= color.palette[1:K]))
+}
+
+
+cls <- cutree(c.hier, k = 4)
+plot.clusters(dt, cls)
+```
+
+1. **Pacientes de riesgo muy bajo** (en magenta): Se trata de personas sin problemas de obesidad (índice de masa corporal inferior 30$kg/m^2$ y espesor de pliegue cutáneo del triceps menor a 30$mm$), con preminencia del rango de edades de hasta 30 años y niveles de glucosa e insulina normales en el examen de glucosa posprandial de 2 horas (hasta los 125$\mu g/l$ y 200$\mu l\ U/ml$ respectivamente).
+2. **Pacientes de riesgo bajo** (en naranja): De manera bastante similar al caso anterior, se trata de personas en la franja de edades bajas (principalmente hasta los 40 años) y niveles de glucosa e insulina normales en el  examen de glucosa posprandial de 2 horas  (hasta los 125$\mu g/l$ y 200$\mu l\ U/ml$ respectivamente). La diferencia fundamental con los pacientes de riesgo muy bajo se encuentra en la existencia de problemas de obesidad, con una distribución del espesor de pliegue cutáneo del triceps concentrada entre 25 y 50$mm$, índice de masa corporal entre 25 y 45$kg/m^2$.
+3. **Pacientes con nivel de riesgo moderado** (en verde): Se trata de pacientes con niveles de glucosa e insulina normales o moderadamente altos en el examen de glucosa posprandial de 2 horas (hasta los 175$\mu g/l$ y 250$\mu l\ U/ml$ respectivamente), con problemas de obesidad y con una distribución del espesor de pliegue cutáneo del triceps concentrada entre 25 y 50$mm$, índice de masa corporal entre 25 y 45$kg/m^2$ y edades preminentemente superiores a los 30 años.
+4. **Pacientes de alto riesgo** (en morado): Se trata de pacientes con niveles de glucosa e insulina altos en el examen de glucosa posprandial de 2 horas (superiores a los 125$\mu g/l$ y 100$\mu l\ U/ml$ respectivamente), con preeminencia de pacientes con problemas de obesidad (*BMI* superior a 30$kg/m^2$ y *SkinThickness* superior a 20$mm$) y distribución de edades amplia y premiecia de edades hasta los 40 años.
 
 ******
 # Representación gráfica
@@ -297,6 +421,13 @@ grid.arrange(p1, p2, layout_matrix=rbind(c(1,2)))
 ******
 # Resolución del problema. Conclusiones  
 
+## Clústering
+
+Se interpreta que hay tres factores que intervienen de manera destacada en la aparición de la enfermedad:
+
+1. La presencia de **problemas de obesidad**, cuyos indicadores son las varaibles *BMI* y *SkinThickness*, está asociada con la presencia de la enferemedad y valores altos (superiores a 25$kg/m^2$ y 20$mm$) podrían ser considerados factores de riesto que aumenta la probabilidad de la misma.
+2. **La edad**. La probabilidad de desarrollo de la enfermedad aumenta sensiblemente con la edad.
+3. Los **resultados del test de glucosa posprandial de 2 horas**, disponibles en las variables *Glucose* e *Insulin*. Se trata de dos variables en que la intensidad del efecto de asociación entre ambas es fuerte (test de pearson de 0.59). Resultados con altos niveles de glucemia y/o de insulina en plasma (superiores a los 125$\mu g/l$ y 100$\mu l\ U/ml$ respectivamente)  están habitualmente relacionados con la presencia de la enfermedad, y habitualmente son considerados un indicador de la misma, a pesar de que en este trabajo no se ha demostrado la causalidad.
 
 ******
 # Agradecimientos 
