@@ -1,5 +1,6 @@
 ---
-title: "Untitled"
+title: "Práctica 2: Estudio sobre la diabetes"
+subtitle: "Asignatura: Tipología y Ciclo de Vida de los Datos (Máster en Ciencia de Datos)"
 author: "Autores: Diego Alberto López Herrera, Pablo Rivas Castellanos"
 date: "Mayo de 2021"
 bibliography: bibliografia.bib
