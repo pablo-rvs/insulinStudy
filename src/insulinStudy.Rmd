@@ -25,8 +25,9 @@ library(gridExtra)
 library(ggcorrplot)
 library(ggdendro)
 library(GGally)
-
 library(VIM)
+library(dplyr)
+library(pROC)
 ```
 
 
@@ -34,11 +35,18 @@ library(VIM)
 # Problema de estudio
 
 ## Importancia
+Se considera un conjunto de datos de interés por dos motivos principales: el origen es una fuente altamente contrastada (*National Institute of Diabetes and Digestive and Kidney Diseases*) y se ofrece información detallada sobre múltiples variables recogidas de las personas de estudio (número de embarazos, presión sanguínea distólica, doblez de piel, nivel de insulina, índice de masa corporal, valor de genealogía de diabetes, edad, diabetes diagnosticada). El conjunto de datos está centrado en un grupo de personas que comparten características comunes: mujeres nativas americanas Pima de al menos 21 años de edad.
 
 ## Objeto
 
+Se pretende realizar varios análisis que permitan conocer mejor esta enfermedad. Se plantean varias cuestiones que se abordarán en detalle en la sección de análisis:
+
+* Identificación de varios grupos de personas en base a los distintos parámetros de estudio.
+* Evaluación de de la asunción de que la genealogía de la diabetes en el diagnostico de la enfermedad para comprobar si es realmente un factor relevante.
+* Generación de un modelo que permita determinar la probabilidad de diagnóstico de la diabetes en base a unos parámetros de entrada.
+
 ## Dataset seleccionado
-Datos de nativos americanos Pima. Primera publicación de los datos, 1990
+Datos de nativas americanas Pima. Primera publicación de los datos, 1990
 Cita:[@mehmet2020]
 
 ******
@@ -371,7 +379,7 @@ ggpairs(dt)
 
 En las proyecciones bidimensionales del espacio no se observan agrupaciones de puntos claras. Si se observan distribuciones diferentes para las variables *Glucose*, *SkinThickness*, *BMI* y *Age* en función de la clase de la variable *Outcome*. Nótese que esta conclusión esta alineada con los resultados del estudio de correlaciones, que detectó importantes correlaciones entre estas variables.
 
-### Ajueste del modelo
+### Ajuste del modelo
 
 Dada su simplicidad y flexibilidad, se decide ajustar un modelo de *clústering* jerárquico sobre el espacio de las variables independientes, para extrapolar los diferentes tipos de pacientes.
 
@@ -414,6 +422,151 @@ plot.clusters(dt, cls)
 3. **Pacientes con nivel de riesgo moderado** (en verde): Se trata de pacientes con niveles de glucosa e insulina normales o moderadamente altos en el examen de glucosa posprandial de 2 horas (hasta los 175$\mu g/l$ y 250$\mu l\ U/ml$ respectivamente), con problemas de obesidad y con una distribución del espesor de pliegue cutáneo del triceps concentrada entre 25 y 50$mm$, índice de masa corporal entre 25 y 45$kg/m^2$ y edades preminentemente superiores a los 30 años.
 4. **Pacientes de alto riesgo** (en morado): Se trata de pacientes con niveles de glucosa e insulina altos en el examen de glucosa posprandial de 2 horas (superiores a los 125$\mu g/l$ y 100$\mu l\ U/ml$ respectivamente), con preeminencia de pacientes con problemas de obesidad (*BMI* superior a 30$kg/m^2$ y *SkinThickness* superior a 20$mm$) y distribución de edades amplia y premiecia de edades hasta los 40 años.
 
+## Contraste de hipótesis
+
+Se decide realizar un constraste de hipótesis que permita identificar si las personas que han sido diagnosticadas como diabéticas presentan un valor de genealogía de la diabetes (variable *DiabetesPedigreeFunction*) mayor que las no diagnosticadas con diabetes, con un intervalo del confianza del 95%.
+
+### Pregunta de investigación
+ 
+¿Las personas diagnósticadas como diabéticas presentan un genealogía de diabetes mayor que las personas no diagnosticadas como diabéticas?
+
+### Inspección preliminar
+
+```{r attr.source='.numberLines', message = FALSE, fig8, fig.height = 5, fig.width=10}
+# distribución de los valores
+ggplot() + geom_density(data=dt, aes(x = DiabetesPedigreeFunction, group = Outcome, colour=Outcome)) + labs(title = "Genealogía de diabetes", subtitle = "Ditribución valores")
+```
+
+```{r attr.source='.numberLines', message = FALSE, fig9, fig.height = 4, fig.width=8}
+# box plot
+ggplot(data = dt, aes(x=Outcome, y=DiabetesPedigreeFunction)) + geom_boxplot()  + 
+  labs(title = "Genealogía de diabetes", subtitle = "Box plot")
+```
+
+A nivel visual, se puede apreciar que se presentan valores más elevados sobre la genealogía de diabetes en las personas diagnosticadas como diabéticas que en las no diagnosticadas.
+
+### Hipótesis nula y alternativa
+
+* **Hipótesis nula**: el valor de genealogía de diabetes de las personas con diabetes diagnosticada es menor o igual que el valor de genealogía de diabetes en personas sin diabetes diagnosticada.
+* **Hipótesis alternativa**: el valor de genealogía de diabetes de las personas con diabetes diagnosticada es mayor que el valor de genealogía de diabetes en personas sin diabetes diagnosticada.
+
+### Método
+
+Se hacen algunas comprobaciones previas antes de determinar todas las características del método a aplicar:
+
+A) Tamaño de las muestras
+
+```{r attr.source='.numberLines'}
+# tamaño de la muestra de personas diagnosticadas como diabéticos
+print(sprintf('Tamaño muestra diabéticas: %i',
+              nrow(dt[dt$Outcome == 1,])))
+# tamaño de la muestra de diestros
+print(sprintf('Tamaño muestra no diabéticas: %i',
+              nrow(dt[dt$Outcome == 0,])))
+```
+
+B) Test de igualdad de varianzas en la genealogía de diabetes.
+
+```{r attr.source='.numberLines'}
+# test de homocedasticidad
+var.test(dt$DiabetesPedigreeFunction[dt$Outcome == 1]
+         , dt$DiabetesPedigreeFunction[dt$Outcome == 0])
+```
+
+El valor observado relacionado con las varianzas muestrales, el ratio de varianzas, es de 1.549969, estando el intervalo de confianza del 95% determinado entre los valores 1.259981 y 1.919708, por lo que se acepta la hipótesis nula (en este caso, la igualdad de las dos varianzas). En resumen, se puede asumir **homocedasticidad**.
+
+El método a aplicar para validar la hipótesis planteada (es decir, para evaluar si hay suficiente evidencia para rechazar la hipótesis nula), depende de las siguientes consideraciones propias del estudio planteado:
+
+1. Se trata de un **contraste de dos muestras independientes sobre la media**, con varianzas desconocidas.
+2. Las muestras consideradas contienen una cantidad elevada de elementos, ya que se dispone de 268 personas diagnosticadas con diabetes y 500 no diagnosticadas. Por tanto, se puede considerar la aplicación del teorema del límite central (*TLC*), que establece que el contraste de hipótesis sobre la media de una muestra se aproxima a una distribución normal aunque la población original no siga una distribución normal, siempre que el tamaño de la muestra n sea suficientemente grande ($n<30$). Se asume, de esta forma, **normalidad** en los datos.
+3. El test estadístico a aplicar va a ser **parámetrico**, puesto que se asume, a través del teorema del límite central, que la población original sigue una distribución normal. Por tanto, se realizará un test paramétrico para obtener las inferencias sobre la población. 
+4. Se trata de un test **unilateral**, pues la hipótesis alternativa plantea tan solo si las personas diagnosticadas con diabetes presentan mayores valores de genealogía de diabetes, por lo que se evalúa tan solo la cola de la derecha, buscando valores lo suficientemente altos de las variables para rechazar la hipótesis nula. 
+5. En base al test de igualdad de varianzas (homocedasticidad) realizado previamente, se concluye que las dos varianzas son iguales con un nivel de confianza del 95 % (se puede asumir **homocedasticidad**)
+
+### Cálculos
+
+```{r attr.source='.numberLines'}
+diab <- dt$DiabetesPedigreeFunction[dt$Outcome == 1]
+no_diab <- dt$DiabetesPedigreeFunction[dt$Outcome == 0]
+# número de observaciones de cada muestra
+n_1 <- length(diab)
+n_2 <- length(no_diab)
+# intervalo de confianza 95%: alfa = 0.05
+alfa <- 0.05
+# media y desviación estándar de las diferencias
+mean_1 <- mean(diab)
+mean_2 <- mean(no_diab)
+s_1 <- sd(diab)
+s_2 <- sd(no_diab)
+sd <- sqrt(((n_1-1)*s_1^2+(n_2-1)*s_2^2)/(n_1+n_2-2))
+# estadístico de contraste
+tobs <- (mean_1-mean_2)/(sd*sqrt(1/n_1+1/n_2))
+#Región de aceptación
+tcrit <- qt(1-alfa, df=n_1+n_2-2)
+#Cálculo del valor p
+pvalue <- pt(tobs, lower.tail=FALSE, df=n_1+n_2-2)
+pvalue <- pnorm(tobs, lower.tail=FALSE)
+
+tobs;tcrit;pvalue
+```
+
+* Estadístico de contraste: 4.885826
+* Valor crítico: 1.646845
+* Valor p: 5.1497943·10<sup>-7</sup>
+
+### Interpretación
+
+Se puede rechazar la hipótesis nula, aceptando la hipótesis alternativa. Por tanto, se infiere que la genealogía de la diabetes en las personas diagnosticadas con diabetes es mayor que las no diagnosticadas con diabetes con un intervalo de confianza del 95%. Cabe destacar que estos resultados serían extrapolables a una población con las mismas características que la muestra de estudio.
+
+## Regresión logística
+
+Se pretende estudiar la probabilidad que tiene una persona de ser diagnosticada con diabetes en base al conocimiento previo de diferentes parámetros: número de embarazos, presión sanguínea distólica, doblez de piel, nivel de insulina, índice de masa corporal, valor de genealogía de diabetes, edad. Se generará un modelo de regresión logística que pueda proporcionar la probabilidad de ser diagnosticada con diabetes en base a dichas variables de entrada.
+
+### Creación del modelo.
+
+Se crea el modelo de regresión logística. 
+
+```{r attr.source='.numberLines'}
+glm_logit = glm(formula= Outcome ~ Pregnancies + Glucose + BloodPressure + SkinThickness
+               + Insulin + BMI + DiabetesPedigreeFunction + Age
+                  , data=dt, family=binomial(link=logit))
+``` 
+
+Se inspecciona el modelo creado:
+
+```{r attr.source='.numberLines'}
+summary(glm_logit)
+```
+
+Por un lado, se puede observar que las variables con una mayor significancia en el modelo son *Pregnancies*, *Glucose* y *BMI*. Todas ellas, tienen una influencia directa (signo positivo) sobre la probabilidad de ser diagnosticada con diabetes y presentan significancia elevada para rechazar la hipótesis nula (Pr[>|z|] < 0.001). Por otra parte, se tienen con significancia alta, pero menor que las comentadas previamente, las variables *DiabetesPedigreeFunction* e *Insulin* (Pr[>|z|] < 0.05), que también influyen de forma directa en la probabilidad de ser diagnosticada de diabetes. Por último, no se consideran significativas para el modelo las variables *BloodPressure*, *SkinThickness* y *Age*.
+
+
+### Evaluación del modelo
+
+Para la evaluación del modelo, se genera, representa e inspecciona la curva ROC:
+
+```{r attr.source='.numberLines', message = FALSE, fig10, fig.height = 7, fig.width=10}
+df_vars_explic <- dt %>% select(Pregnancies, Glucose, BloodPressure, SkinThickness,
+                                  Insulin, BMI, DiabetesPedigreeFunction, Age)
+prob <- predict(glm_logit, 
+                df_vars_explic, 
+                type="response")
+r <- roc(dt$Outcome, prob, data=df_vars_explic)
+plot(r)
+```
+
+Se evalúa el área bajo la curva ROC (AUROC):
+
+```{r attr.source='.numberLines'}
+auc(r)
+```
+
+Visualmente se aprecia que la curva ROC llega a alejarse mucho a la diagonal, con lo que el área bajo la curva (AUROC) se intuye de un tamaño significativo. Al calcularla, se obtiene un valor de AUROC=0.8511 que confirma lo que se había intuido visualmente, con lo que se puede determinar que el modelo discrimina de forma excelente.
+
+### Visualización de datos e interpretación
+
+Se ha generado un modelo de regresión logística que permite discriminar de forma excelente la probabilidad de ser diagnosticada con diabetes. Las variables con una mayor significancia en el modelo son *Pregnancies*, *Glucose* y *BMI*, presentando todas ellas una influencia directa (signo positivo) en la probabilidad de ser diagnosticada con diabetes. 
+
 ******
 # Representación gráfica
 
@@ -428,6 +581,14 @@ Se interpreta que hay tres factores que intervienen de manera destacada en la ap
 1. La presencia de **problemas de obesidad**, cuyos indicadores son las varaibles *BMI* y *SkinThickness*, está asociada con la presencia de la enferemedad y valores altos (superiores a 25$kg/m^2$ y 20$mm$) podrían ser considerados factores de riesto que aumenta la probabilidad de la misma.
 2. **La edad**. La probabilidad de desarrollo de la enfermedad aumenta sensiblemente con la edad.
 3. Los **resultados del test de glucosa posprandial de 2 horas**, disponibles en las variables *Glucose* e *Insulin*. Se trata de dos variables en que la intensidad del efecto de asociación entre ambas es fuerte (test de pearson de 0.59). Resultados con altos niveles de glucemia y/o de insulina en plasma (superiores a los 125$\mu g/l$ y 100$\mu l\ U/ml$ respectivamente)  están habitualmente relacionados con la presencia de la enfermedad, y habitualmente son considerados un indicador de la misma, a pesar de que en este trabajo no se ha demostrado la causalidad.
+
+## Contraste de hipótesis
+
+Se infiere que la genealogía de la diabetes en las mujeres nativas norteamericanas mayores de 21 años diagnosticadas con diabetes es mayor que las no diagnosticadas con diabetes con un intervalo de confianza del 95%. 
+
+## Regresión logística
+
+Se ha generado un modelo de regresión logística que permite discriminar de forma excelente la probabilidad de ser diagnosticada con diabetes. Las variables con una mayor significancia en el modelo son *Pregnancies*, *Glucose* y *BMI*, presentando todas ellas una influencia directa (signo positivo) en la probabilidad de ser diagnosticada con diabetes.
 
 ******
 # Agradecimientos 
