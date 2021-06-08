@@ -34,20 +34,18 @@ library(pROC)
 ******
 # Problema de estudio
 
-## Importancia
-Se considera un conjunto de datos de interés por dos motivos principales: el origen es una fuente altamente contrastada (*National Institute of Diabetes and Digestive and Kidney Diseases*) y se ofrece información detallada sobre múltiples variables recogidas de las personas de estudio (número de embarazos, presión sanguínea distólica, doblez de piel, nivel de insulina, índice de masa corporal, valor de genealogía de diabetes, edad, diabetes diagnosticada). El conjunto de datos está centrado en un grupo de personas que comparten características comunes: mujeres nativas americanas Pima de al menos 21 años de edad.
-
 ## Objeto
 
-Se pretende realizar varios análisis que permitan conocer mejor esta enfermedad. Se plantean varias cuestiones que se abordarán en detalle en la sección de análisis:
+Se pretende realizar varios análisis que permitan conocer mejor la diabetes. Se plantean varias cuestiones que se abordarán en detalle en la sección de análisis:
 
 * Identificación de varios grupos de personas en base a los distintos parámetros de estudio.
 * Evaluación de de la asunción de que la genealogía de la diabetes en el diagnostico de la enfermedad para comprobar si es realmente un factor relevante.
 * Generación de un modelo que permita determinar la probabilidad de diagnóstico de la diabetes en base a unos parámetros de entrada.
 
-## Dataset seleccionado
-Datos de nativas americanas Pima. Primera publicación de los datos, 1990
-Cita:[@mehmet2020]
+## Importancia
+
+Para dar respuesta a estas interrogantes, se empleará el dataset *Diabetes Data Set*, disponible en *https://www.kaggle.com/mathchi/diabetes-data-set* [@mehmet2020].
+Se considera un conjunto de datos de interés por dos motivos principales: el origen es una fuente altamente contrastada (*National Institute of Diabetes and Digestive and Kidney Diseases*) y se ofrece información detallada sobre múltiples variables recogidas de las personas de estudio (número de embarazos, presión sanguínea distólica, doblez de piel, nivel de insulina, índice de masa corporal, valor de genealogía de diabetes, edad, diabetes diagnosticada). El conjunto de datos está centrado en un grupo de personas que comparten características comunes: mujeres nativas americanas Pima de al menos 21 años de edad. 
 
 ******
 # Integración y selección de los datos
@@ -80,6 +78,7 @@ dt$Outcome <- as.factor(dt$Outcome)
 ```
 
 | Variable | Tipo | Descripción |
+|:---|:---|:---|
 | Pregnancies | Numérica entera | Número de embarazos. |
 | Glucose | Numérica entera | Niveles de glucosa en plasma del examen de glucosa posprandial de 2 horas ($\mu g/l$). |
 | BloodPressure | Numérica entera | Presión arterial diastólica (mmHg). |
@@ -261,9 +260,17 @@ mdl <- svd(mat.dt1)
 mdl$d
 ```
 
-Tras comparar los valores propios obtenidos se comprueba que pertenecen al mismo orden de magnitud. Por este motivo se considera apropiado mantener la base original al tener una interpretación más inmediata.
+Tras comparar los valores propios obtenidos se observa que pertenecen al mismo orden de magnitud. Por este motivo se considera apropiado mantener la base original al tener una interpretación más inmediata.
 
-## Estudio bivariante.
+## Publicación de datos preprocesados
+
+Tras completarse la limpieza de los datos, se procede a exportarlos para permitir su reutilización posterior.
+
+```{r attr.source='.numberLines'}
+write.csv(dt,"../res/diabetes_clean.csv", row.names = FALSE)
+```
+
+## Estudio bivariante
 
 En este apartado se trata de desarrollar una mayor comprensión de la distribución de las distintas variables y la intensidad del efecto de correlación entre ellas y con la variable dependiente.
 
@@ -311,19 +318,19 @@ do.call(grid.arrange, c(bar.plots, ncol=4))
 A partir del estudio visual de las gráficas, se plantean las siguiente hipótesis:
 
 1. La probabilidad de desarrollar diabetes aumenta con el número de embarazos. 
-2. Niveles altos de glucosa o de insulina en el examen de glucosa posprandial de 2 horas son un indicador de la enfermedad. También son indicadores de la enfermedad o factores de riesgo niveles de presion sanguínea alta, espesor del pliegue cutáneo del triceps altos o índices de masa corporal elevado. 
+2. Niveles altos de glucosa o de insulina en el examen de glucosa posprandial de 2 horas son un indicador de la enfermedad. También son indicadores de la enfermedad o factores de riesgo niveles de presión sanguínea alta, espesor del pliegue cutáneo del triceps altos o índices de masa corporal elevado. 
 3. Parece observarse una tendencia creciente del recuento de diabéticos con el aumento de la función de pedigree. 
 
 ### Estudio de correlaciones
 
-Para complementar el estudio visual de la distribución de las variables se realizará un estudio de correlaciones empleando los estadísticos *eta cuadrado* $\eta ^2$ y *coeficiente de Pearson*. Nótese que el objetivo de calcular ambos coeficientes es la de disponer de una estimación aproximada de la intensidad del efecto de asociación/correlación entre variables, es decir, de la significancia práctica, independientemente de la significancia estadística. Por este motivo, tomando en consideración la robustez del método ANOVA frente a la falta de normalidad (que se observa en *Pregnancias*, *Age* o *DiabetesPedigreeFunction*), se considera aceptable el uso del coeficiente.
+Para complementar el estudio visual de la distribución de las variables se realizará un estudio de correlaciones empleando los estadísticos *eta cuadrado* $\eta ^2$ y *coeficiente de Pearson*. Nótese que el objetivo de calcular ambos coeficientes es la de disponer de una estimación aproximada de la intensidad del efecto de asociación/correlación entre variables, es decir, de la significancia práctica, independientemente de la significancia estadística. Por este motivo, tomando en consideración la robustez del método ANOVA frente a la falta de normalidad (que se observa en *Pregnancies*, *Age* o *DiabetesPedigreeFunction*), se considera aceptable el uso del coeficiente.
 
 Para la interpretación del coeficiente se pueden emplear los valores de la tabla siguiente:
 
 | Coeficiente | Efecto débil | Efecto moderado | Efecto fuerte |
 |:---|:---|:---|:---|
-| $\eta²$ [@eta2] | [0.01, 0.06] | (0.06, 0.14] | (0.14, 1] |
-| abs(Coeficiente de pearson) [@pearson] | [0, 0.3] | (0.3, 0.5] | (0.5, 1] |
+| $\eta^2$ [@eta2] | [0.01, 0.06] | (0.06, 0.14] | (0.14, 1] |
+| abs(coef. Pearson) [@pearson] | [0, 0.3] | (0.3, 0.5] | (0.5, 1] |
 
 ```{r attr.source='.numberLines', message = FALSE, fig4, fig.height = 8, fig.width=18}
 # Crames's V correlation
@@ -354,10 +361,10 @@ grid.arrange(p1, p2, layout_matrix=rbind(c(1,2)))
 ```
 
 
-Se concluye que existen fuertes asociaciones entre las siguients parejas de variables:
+Se concluye que existen fuertes asociaciones entre las siguientes parejas de variables:
 
 1. *Age* Vs. *Pregnancies*: esta asociación se puede explicar dada la naturaleza acumulativa de las dos variables: hasta ciertas edades, un número elevado de embarazos indicará edades más avanzadas.
-2. *Insulin* Vs. *Glucose*: estas dos variables están asocidas al tratarse de los resultados de una misma prueba y ser la insulina una hormona que interviene directamente ne el control de la glucemia. 
+2. *Insulin* Vs. *Glucose*: estas dos variables están asociadas al tratarse de los resultados de una misma prueba y ser la insulina una hormona que interviene directamente ne el control de la glucemia. 
 3. *BMI* Vs. *SkinThickness*: la relación entre estas dos variables también es explicable, dado que mayores índices de masa corporal resultarán en medidas mas altas de espesor del pliegue cutáneo del triceps.
 4. *Glucose* y *Insulin* Vs. *Outcome*: Los niveles de glucosa y de insulina tras el examen de glucosa posprandial de 2 horas están fuertemente relacionado con la variable dependiente.
 
@@ -367,7 +374,7 @@ Se concluye que existen fuertes asociaciones entre las siguients parejas de vari
 
 ## Clustering
 
-Para obtener una comprensión más completa acerca de la composición del espacio de soluciones se plantea el empleo de modelos de aprendizaje automático no supervisado de *clústering*. 
+Para obtener una comprensión más completa acerca de la composición del espacio de soluciones se plantea el empleo de modelos de aprendizaje automático no supervisado de *clustering*. 
 
 ### Inspección preliminar
 
@@ -381,7 +388,7 @@ En las proyecciones bidimensionales del espacio no se observan agrupaciones de p
 
 ### Ajuste del modelo
 
-Dada su simplicidad y flexibilidad, se decide ajustar un modelo de *clústering* jerárquico sobre el espacio de las variables independientes, para extrapolar los diferentes tipos de pacientes.
+Dada su simplicidad y flexibilidad, se decide ajustar un modelo de *clustering* jerárquico sobre el espacio de las variables independientes, para extrapolar los diferentes tipos de pacientes.
 
 ```{r attr.source='.numberLines', message = FALSE, fig6, fig.height = 15, fig.width=15}
 scaled.dt <- dt[,!(names(dt) %in% c("Outcome"))]
@@ -417,18 +424,18 @@ cls <- cutree(c.hier, k = 4)
 plot.clusters(dt, cls)
 ```
 
-1. **Pacientes de riesgo muy bajo** (en magenta): Se trata de personas sin problemas de obesidad (índice de masa corporal inferior 30$kg/m^2$ y espesor de pliegue cutáneo del triceps menor a 30$mm$), con preminencia del rango de edades de hasta 30 años y niveles de glucosa e insulina normales en el examen de glucosa posprandial de 2 horas (hasta los 125$\mu g/l$ y 200$\mu l\ U/ml$ respectivamente).
+1. **Pacientes de riesgo muy bajo** (en magenta): Se trata de personas sin problemas de obesidad (índice de masa corporal inferior 30$kg/m^2$ y espesor de pliegue cutáneo del triceps menor a 30$mm$), con preeminencia del rango de edades de hasta 30 años y niveles de glucosa e insulina normales en el examen de glucosa posprandial de 2 horas (hasta los 125$\mu g/l$ y 200$\mu l\ U/ml$ respectivamente).
 2. **Pacientes de riesgo bajo** (en naranja): De manera bastante similar al caso anterior, se trata de personas en la franja de edades bajas (principalmente hasta los 40 años) y niveles de glucosa e insulina normales en el  examen de glucosa posprandial de 2 horas  (hasta los 125$\mu g/l$ y 200$\mu l\ U/ml$ respectivamente). La diferencia fundamental con los pacientes de riesgo muy bajo se encuentra en la existencia de problemas de obesidad, con una distribución del espesor de pliegue cutáneo del triceps concentrada entre 25 y 50$mm$, índice de masa corporal entre 25 y 45$kg/m^2$.
-3. **Pacientes con nivel de riesgo moderado** (en verde): Se trata de pacientes con niveles de glucosa e insulina normales o moderadamente altos en el examen de glucosa posprandial de 2 horas (hasta los 175$\mu g/l$ y 250$\mu l\ U/ml$ respectivamente), con problemas de obesidad y con una distribución del espesor de pliegue cutáneo del triceps concentrada entre 25 y 50$mm$, índice de masa corporal entre 25 y 45$kg/m^2$ y edades preminentemente superiores a los 30 años.
-4. **Pacientes de alto riesgo** (en morado): Se trata de pacientes con niveles de glucosa e insulina altos en el examen de glucosa posprandial de 2 horas (superiores a los 125$\mu g/l$ y 100$\mu l\ U/ml$ respectivamente), con preeminencia de pacientes con problemas de obesidad (*BMI* superior a 30$kg/m^2$ y *SkinThickness* superior a 20$mm$) y distribución de edades amplia y premiecia de edades hasta los 40 años.
+3. **Pacientes con nivel de riesgo moderado** (en verde): Se trata de pacientes con niveles de glucosa e insulina normales o moderadamente altos en el examen de glucosa posprandial de 2 horas (hasta los 175$\mu g/l$ y 250$\mu l\ U/ml$ respectivamente), con problemas de obesidad y con una distribución del espesor de pliegue cutáneo del triceps concentrada entre 25 y 50$mm$, índice de masa corporal entre 25 y 45$kg/m^2$ y edades preeminentemente superiores a los 30 años.
+4. **Pacientes de alto riesgo** (en morado): Se trata de pacientes con niveles de glucosa e insulina altos en el examen de glucosa posprandial de 2 horas (superiores a los 125$\mu g/l$ y 100$\mu l\ U/ml$ respectivamente), con preeminencia de pacientes con problemas de obesidad (*BMI* superior a 30$kg/m^2$ y *SkinThickness* superior a 20$mm$) y distribución de edades amplia y preeminecia de edades hasta los 40 años.
 
 ## Contraste de hipótesis
 
-Se decide realizar un constraste de hipótesis que permita identificar si las personas que han sido diagnosticadas como diabéticas presentan un valor de genealogía de la diabetes (variable *DiabetesPedigreeFunction*) mayor que las no diagnosticadas con diabetes, con un intervalo del confianza del 95%.
+Se decide realizar un contraste de hipótesis que permita identificar si las personas que han sido diagnosticadas como diabéticas presentan un valor de genealogía de la diabetes (variable *DiabetesPedigreeFunction*) mayor que las no diagnosticadas con diabetes, con un intervalo del confianza del 95%.
 
 ### Pregunta de investigación
  
-¿Las personas diagnósticadas como diabéticas presentan un genealogía de diabetes mayor que las personas no diagnosticadas como diabéticas?
+¿Las personas diagnosticadas como diabéticas presentan un genealogía de diabetes mayor que las personas no diagnosticadas como diabéticas?
 
 ### Inspección preliminar
 
@@ -540,7 +547,6 @@ summary(glm_logit)
 
 Por un lado, se puede observar que las variables con una mayor significancia en el modelo son *Pregnancies*, *Glucose* y *BMI*. Todas ellas, tienen una influencia directa (signo positivo) sobre la probabilidad de ser diagnosticada con diabetes y presentan significancia elevada para rechazar la hipótesis nula (Pr[>|z|] < 0.001). Por otra parte, se tienen con significancia alta, pero menor que las comentadas previamente, las variables *DiabetesPedigreeFunction* e *Insulin* (Pr[>|z|] < 0.05), que también influyen de forma directa en la probabilidad de ser diagnosticada de diabetes. Por último, no se consideran significativas para el modelo las variables *BloodPressure*, *SkinThickness* y *Age*.
 
-
 ### Evaluación del modelo
 
 Para la evaluación del modelo, se genera, representa e inspecciona la curva ROC:
@@ -568,17 +574,13 @@ Visualmente se aprecia que la curva ROC llega a alejarse mucho a la diagonal, co
 Se ha generado un modelo de regresión logística que permite discriminar de forma excelente la probabilidad de ser diagnosticada con diabetes. Las variables con una mayor significancia en el modelo son *Pregnancies*, *Glucose* y *BMI*, presentando todas ellas una influencia directa (signo positivo) en la probabilidad de ser diagnosticada con diabetes. 
 
 ******
-# Representación gráfica
-
-
-******
 # Resolución del problema. Conclusiones  
 
 ## Clústering
 
 Se interpreta que hay tres factores que intervienen de manera destacada en la aparición de la enfermedad:
 
-1. La presencia de **problemas de obesidad**, cuyos indicadores son las varaibles *BMI* y *SkinThickness*, está asociada con la presencia de la enferemedad y valores altos (superiores a 25$kg/m^2$ y 20$mm$) podrían ser considerados factores de riesto que aumenta la probabilidad de la misma.
+1. La presencia de **problemas de obesidad**, cuyos indicadores son las variables *BMI* y *SkinThickness*, está asociada con la presencia de la enfermedad y valores altos (superiores a 25$kg/m^2$ y 20$mm$) podrían ser considerados factores de riesgo que aumenta la probabilidad de la misma.
 2. **La edad**. La probabilidad de desarrollo de la enfermedad aumenta sensiblemente con la edad.
 3. Los **resultados del test de glucosa posprandial de 2 horas**, disponibles en las variables *Glucose* e *Insulin*. Se trata de dos variables en que la intensidad del efecto de asociación entre ambas es fuerte (test de pearson de 0.59). Resultados con altos niveles de glucemia y/o de insulina en plasma (superiores a los 125$\mu g/l$ y 100$\mu l\ U/ml$ respectivamente)  están habitualmente relacionados con la presencia de la enfermedad, y habitualmente son considerados un indicador de la misma, a pesar de que en este trabajo no se ha demostrado la causalidad.
 
@@ -591,5 +593,14 @@ Se infiere que la genealogía de la diabetes en las mujeres nativas norteamerica
 Se ha generado un modelo de regresión logística que permite discriminar de forma excelente la probabilidad de ser diagnosticada con diabetes. Las variables con una mayor significancia en el modelo son *Pregnancies*, *Glucose* y *BMI*, presentando todas ellas una influencia directa (signo positivo) en la probabilidad de ser diagnosticada con diabetes.
 
 ******
-# Agradecimientos 
+# Contribuciones
+
+| Contribuciones | Firma |
+|:---|:---|
+| Investigación previa | DALH, PRC |
+| Redacción de las respuestas | DALH, PRC |
+| Desarrollo del código | DALH, PRC |
+
+******
+# Bibligrafía y agradecimientos 
 
